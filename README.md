@@ -31,7 +31,7 @@ you should have [numpy](http://www.numpy.org/) and [PyOpenGL](http://pyopengl.so
 
 ## Installation
 ```
-git clone https://github.com/uoip/pangolin.git
+git clone https://github.com/plasticuproject/pangolin.git
 cd pangolin
 mkdir build
 cd build
