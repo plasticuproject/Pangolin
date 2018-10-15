@@ -55,9 +55,9 @@ VarState::~VarState() {
 }
 
 void VarState::Clear() {
-    for(VarStoreContainer::iterator i = vars.begin(); i != vars.end(); ++i) {
-        delete i->second;
-    }
+    //for(VarStoreContainer::iterator i = vars.begin(); i != vars.end(); ++i) {
+    //    delete i->second;
+    //}
     vars.clear();
     var_adds.clear();
 }

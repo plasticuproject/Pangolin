@@ -1,5 +1,3 @@
-#pragma once
-
 #include <pangolin/display/window.h>
 #include <pangolin/platform.h>
 #include <pangolin/video/video_input.h>

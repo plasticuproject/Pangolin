@@ -95,8 +95,6 @@ public:
 
     void Download(TypedImage& image) const;
 
-    void CopyFrom(const GlTexture& tex);
-
     void Save(const std::string& filename, bool top_line_first = true);
 
     void SetLinear();

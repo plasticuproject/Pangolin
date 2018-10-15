@@ -34,20 +34,11 @@
 // Some versions of FFMPEG define this horrid macro in global scope.
 #undef PixelFormat
 
-// It is impossible to keep up with ffmpeg deprecations, so ignore these warnings.
-#if defined(_GCC_) || defined(_CLANG_)
-#  pragma GCC diagnostic ignored "-Wdeprecated"
-#endif
-
-
 extern "C"
 {
 #include <libavformat/avio.h>
 #include <libavutil/mathematics.h>
-#include <libavdevice/avdevice.h>
 }
-
-#define CODEC_FLAG_GLOBAL_HEADER AV_CODEC_FLAG_GLOBAL_HEADER
 
 namespace pangolin
 {
@@ -89,10 +80,8 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
     TEST_PIX_FMT_RETURN(YUVJ420P);
     TEST_PIX_FMT_RETURN(YUVJ422P);
     TEST_PIX_FMT_RETURN(YUVJ444P);
-#ifdef FF_API_XVMC
     TEST_PIX_FMT_RETURN(XVMC_MPEG2_MC);
     TEST_PIX_FMT_RETURN(XVMC_MPEG2_IDCT);
-#endif
     TEST_PIX_FMT_RETURN(UYVY422);
     TEST_PIX_FMT_RETURN(UYYVYY411);
     TEST_PIX_FMT_RETURN(BGR8);
@@ -112,13 +101,11 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
     TEST_PIX_FMT_RETURN(YUV440P);
     TEST_PIX_FMT_RETURN(YUVJ440P);
     TEST_PIX_FMT_RETURN(YUVA420P);
-#ifdef FF_API_VDPAU
     TEST_PIX_FMT_RETURN(VDPAU_H264);
     TEST_PIX_FMT_RETURN(VDPAU_MPEG1);
     TEST_PIX_FMT_RETURN(VDPAU_MPEG2);
     TEST_PIX_FMT_RETURN(VDPAU_WMV3);
     TEST_PIX_FMT_RETURN(VDPAU_VC1);
-#endif
     TEST_PIX_FMT_RETURN(RGB48BE );
     TEST_PIX_FMT_RETURN(RGB48LE );
     TEST_PIX_FMT_RETURN(RGB565BE);
@@ -138,9 +125,7 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
     TEST_PIX_FMT_RETURN(YUV422P16BE);
     TEST_PIX_FMT_RETURN(YUV444P16LE);
     TEST_PIX_FMT_RETURN(YUV444P16BE);
-#ifdef FF_API_VDPAU
     TEST_PIX_FMT_RETURN(VDPAU_MPEG4);
-#endif
     TEST_PIX_FMT_RETURN(DXVA2_VLD);
     TEST_PIX_FMT_RETURN(RGB444BE);
     TEST_PIX_FMT_RETURN(RGB444LE);
@@ -154,35 +139,28 @@ std::string FfmpegFmtToString(const AVPixelFormat fmt)
 
 #undef TEST_PIX_FMT_RETURN
 
-FfmpegVideo::FfmpegVideo(const std::string filename, const std::string strfmtout, const std::string codec_hint, bool dump_info, int user_video_stream, ImageDim size)
+FfmpegVideo::FfmpegVideo(const std::string filename, const std::string strfmtout, const std::string codec_hint, bool dump_info, int user_video_stream)
     :pFormatCtx(0)
 {
-    InitUrl(filename, strfmtout, codec_hint, dump_info, user_video_stream, size);
+    InitUrl(filename, strfmtout, codec_hint, dump_info, user_video_stream);
 }
 
-void FfmpegVideo::InitUrl(const std::string url, const std::string strfmtout, const std::string codec_hint, bool dump_info, int user_video_stream, ImageDim size)
+void FfmpegVideo::InitUrl(const std::string url, const std::string strfmtout, const std::string codec_hint, bool dump_info, int user_video_stream)
 {
     if( url.find('*') != url.npos )
         throw VideoException("Wildcards not supported. Please use ffmpegs printf style formatting for image sequences. e.g. img-000000%04d.ppm");
     
     // Register all formats and codecs
     av_register_all();
-    // Register all devices
-    avdevice_register_all();
-
+    
     AVInputFormat* fmt = NULL;
     
     if( !codec_hint.empty() ) {
         fmt = av_find_input_format(codec_hint.c_str());
     }
-
+    
 #if (LIBAVFORMAT_VERSION_MAJOR >= 53)
-    AVDictionary* options = nullptr;
-    if(size.x != 0 && size.y != 0) {        
-        std::string s = std::to_string(size.x) + "x" + std::to_string(size.y);
-	av_dict_set(&options, "video_size", s.c_str(), 0);
-    }
-    if( avformat_open_input(&pFormatCtx, url.c_str(), fmt, &options) )
+    if( avformat_open_input(&pFormatCtx, url.c_str(), fmt, NULL) )
 #else
     // Deprecated - can't use with mjpeg
     if( av_open_input_file(&pFormatCtx, url.c_str(), fmt, 0, NULL) )
@@ -268,7 +246,7 @@ void FfmpegVideo::InitUrl(const std::string url, const std::string strfmtout, co
     pFrame = av_frame_alloc();
     pFrameOut = av_frame_alloc();
 #else
-    // deprecated
+	// deprecated
     pFrame = avcodec_alloc_frame();
     pFrameOut = avcodec_alloc_frame();
 #endif
@@ -600,7 +578,6 @@ void FfmpegVideoOutputStream::WriteFrame(AVFrame* frame)
     int ret;
     int got_packet = 1;
 
-#if FF_API_LAVF_FMT_RAWPICTURE
     // Setup AVPacket
     if (recorder.oc->oformat->flags & AVFMT_RAWPICTURE) {
         /* Raw video case - directly store the picture in the packet */
@@ -610,9 +587,6 @@ void FfmpegVideoOutputStream::WriteFrame(AVFrame* frame)
         pkt.pts           = frame->pts;
         ret = 0;
     } else {
-#else
-    {
-#endif
         /* encode the image */
 #if (LIBAVFORMAT_VERSION_MAJOR >= 54)
         ret = avcodec_encode_video2(stream->codec, &pkt, frame, &got_packet);
@@ -840,13 +814,13 @@ PANGOLIN_REGISTER_FACTORY(FfmpegVideo)
 {
     struct FfmpegVideoFactory : public FactoryInterface<VideoInterface> {
         std::unique_ptr<VideoInterface> Open(const Uri& uri) override {
-            const std::array<std::string,43> ffmpeg_ext = {{
-                ".3g2",".3gp", ".amv", ".asf", ".avi", ".drc", ".flv", ".f4v",
+            const std::array<std::string,49> ffmpeg_ext = {
+                ".3g2",".3gp", ".amv", ".asf", ".avi", ".drc", ".flv", ".flv", ".flv", ".f4v",
                 ".f4p", ".f4a", ".f4b", ".gif", ".gifv", ".m4v", ".mkv", ".mng", ".mov", ".qt",
                 ".mp4", ".m4p", ".m4v", ".mpg", ".mp2", ".mpeg", ".mpe", ".mpv", ".mpg", ".mpeg",
                 ".m2v", ".mxf", ".nsv",  ".ogv", ".ogg", ".rm", ".rmvb", ".roq", ".svi", ".vob",
                 ".webm", ".wmv", ".yuv", ".h264", ".h265"
-            }};
+            };
 
             if(!uri.scheme.compare("ffmpeg") || !uri.scheme.compare("file") || !uri.scheme.compare("files") )
             {
@@ -861,11 +835,7 @@ PANGOLIN_REGISTER_FACTORY(FfmpegVideo)
                 ToUpper(outfmt);
                 const int video_stream = uri.Get<int>("stream",-1);
                 return std::unique_ptr<VideoInterface>( new FfmpegVideo(uri.url.c_str(), outfmt, "", false, video_stream) );
-            }else if( !uri.scheme.compare("v4lmjpeg")) {
-                const int video_stream = uri.Get<int>("stream",-1);
-                const ImageDim size = uri.Get<ImageDim>("size",ImageDim(0,0));
-                return std::unique_ptr<VideoInterface>( new FfmpegVideo(uri.url.c_str(),"RGB24", "video4linux", false, video_stream, size) );
-            } else if( !uri.scheme.compare("mjpeg")) {
+            }else if( !uri.scheme.compare("mjpeg")) {
                 return std::unique_ptr<VideoInterface>( new FfmpegVideo(uri.url.c_str(),"RGB24", "MJPEG" ) );
             }else if( !uri.scheme.compare("convert") ) {
                 std::string outfmt = uri.Get<std::string>("fmt","RGB24");
@@ -880,7 +850,6 @@ PANGOLIN_REGISTER_FACTORY(FfmpegVideo)
 
     auto factory = std::make_shared<FfmpegVideoFactory>();
     FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "ffmpeg");
-    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "v4lmjpeg");
     FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "mjpeg");
     FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 20, "convert");
     FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 15, "file");

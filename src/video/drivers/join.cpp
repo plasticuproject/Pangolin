@@ -200,7 +200,7 @@ bool JoinVideo::GrabNext(unsigned char* image, bool wait)
         auto range = std::minmax_element(capture_us.begin(), capture_us.end());
         if( (*range.second - *range.first) > sync_tolerance_us)
         {
-            pango_print_warn("JoinVideo: Source timestamps span  %lu us, not within %lu us. Ignoring frames, trying to sync...\n", (unsigned long)((*range.second - *range.first)), (unsigned long)sync_tolerance_us);
+            pango_print_warn("JoinVideo: Source timestamps not within %lu us. Ignoring frames, trying to sync...\n", (unsigned long)sync_tolerance_us);
 
             // Attempt to resync...
             for(size_t n=0; n<10; ++n){
@@ -225,10 +225,7 @@ bool JoinVideo::GrabNext(unsigned char* image, bool wait)
             TGRABANDPRINT("    IN SYNC oldest:%ld newest:%ld delta:%ld", *range.first, *range.second, (*range.second - *range.first));
             return true;
         }
-    }
-    else
-    {
-        pango_print_warn("JoinVideo: sync_tolerance_us = 0, frames are not synced!\n");
+    } else {
         return true;
     }
 }

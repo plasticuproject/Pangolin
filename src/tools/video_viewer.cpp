@@ -35,7 +35,6 @@ VideoViewer::VideoViewer(const std::string& window_name, const std::string& inpu
 {
     pangolin::Var<int>::Attach("ui.frame", current_frame);
     pangolin::Var<int>::Attach("ui.record_nth_frame", record_nth_frame);
-    pangolin::Var<int>::Attach("ui.draw_nth_frame", draw_nth_frame);
 
 
     if(!input_uri.empty()) {
@@ -182,10 +181,9 @@ void VideoViewer::Run()
 
                 // Update images
                 if((frame-1) % draw_nth_frame == 0) {
-                    for(unsigned int i=0; i<images.size(); ++i) 
-                        if(stream_views[i].IsShown()) {
-                            stream_views[i].SetImage(images[i], pangolin::GlPixFormat(video.Streams()[i].PixFormat() ));
-                        }
+                    for(unsigned int i=0; i<images.size(); ++i) {
+                        stream_views[i].SetImage(images[i], pangolin::GlPixFormat(video.Streams()[i].PixFormat() ));
+                    }
                 }
             }
         }
@@ -330,16 +328,6 @@ void VideoViewer::SetDiscardBufferedFrames(bool new_state)
 
 void VideoViewer::DrawEveryNFrames(int n)
 {
-    if(n <= 0) {
-        pango_print_warn("Cannot draw every %d frames. Ignoring request.\n",n);
-        return;
-    }
-
-    if(n != draw_nth_frame && n == 1)
-        pango_print_info("Drawing every frame.\n");
-    if(n != draw_nth_frame && n > 1)
-        pango_print_info("Drawing one in every %d frames.\n",n);
-
     draw_nth_frame=n;
 }
 
@@ -361,11 +349,8 @@ void VideoViewer::Skip(int frames)
     std::lock_guard<std::mutex> lock(control_mutex);
 
     if(video_playback) {
-        const int next_frame = current_frame + frames;
-        if (next_frame >= 0) {
-            current_frame = video_playback->Seek(next_frame) -1;
-            grab_until = current_frame + 1;
-        } 
+        current_frame = video_playback->Seek(current_frame + frames) -1;
+        grab_until = current_frame + 1;
     }else{
         if(frames >= 0) {
             grab_until = current_frame + frames;

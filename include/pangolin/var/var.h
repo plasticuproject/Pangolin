@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <memory>
 #include <stdexcept>
 #include <string.h>
 #include <cmath>
@@ -89,20 +90,14 @@ public:
     ) {
         // Find name in VarStore
         VarValueGeneric*& v = VarState::I()[name];
+        //std::shared_ptr<VarValueGeneric>& v = VarState::I()[name];
         if(v) {
             throw std::runtime_error("Var with that name already exists.");
         }else{
             // new VarRef<T> (owned by VarStore)
             VarValue<T&>* nv = new VarValue<T&>(variable);
             v = nv;
-            if(logscale) {
-                if (min <= 0 || max <= 0) {
-                    throw std::runtime_error("LogScale: range of numbers must be positive!");
-                }
-                InitialiseNewVarMeta(*nv, name, std::log(min), std::log(max), 1, logscale);
-            }else{
-                InitialiseNewVarMeta(*nv, name, min, max, 1, logscale);
-            }
+            InitialiseNewVarMeta<T&>(*nv,name,min,max,1,logscale);
         }
         return variable;
     }
@@ -112,6 +107,7 @@ public:
         ) {
         // Find name in VarStore
         VarValueGeneric*& v = VarState::I()[name];
+        //std::shared_ptr<VarValueGeneric>& v = VarState::I()[name];
         if (v) {
             throw std::runtime_error("Var with that name already exists.");
         }
@@ -141,6 +137,7 @@ public:
     {
         // Find name in VarStore
         VarValueGeneric*& v = VarState::I()[name];
+        //std::shared_ptr<VarValueGeneric>& v = VarState::I()[name];
         if(v && !v->Meta().generic) {
             InitialiseFromGeneric(v);
         }else{
@@ -164,6 +161,7 @@ public:
     {
         // Find name in VarStore
         VarValueGeneric*& v = VarState::I()[name];
+        //std::shared_ptr<VarValueGeneric>& v = VarState::I()[name];
         if(v && !v->Meta().generic) {
             InitialiseFromGeneric(v);
         }else{
@@ -189,6 +187,7 @@ public:
     {
         // Find name in VarStore
         VarValueGeneric*& v = VarState::I()[name];
+        //std::shared_ptr<VarValueGeneric>& v = VarState::I()[name];
         if(v && !v->Meta().generic) {
             InitialiseFromGeneric(v);
         }else{
@@ -278,6 +277,7 @@ public:
 protected:
     // Initialise from existing variable, obtain data / accessor
     void InitialiseFromGeneric(VarValueGeneric* v)
+    //void InitialiseFromGeneric(std::shared_ptr<VarValueGeneric> v)
     {
         if( !strcmp(v->TypeId(), typeid(T).name()) ) {
             // Same type

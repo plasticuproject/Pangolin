@@ -31,6 +31,7 @@
 #include <pangolin/gl/gldraw.h>
 #include <pangolin/var/varextra.h>
 #include <pangolin/utils/file_utils.h>
+#include <pangolin/compat/glutbitmap.h>
 
 #include <thread>
 #include <mutex>
@@ -485,9 +486,6 @@ void Slider::Render()
     }
     
     glColor4fv(colour_tx);
-    if(gltext.Text() != var->Meta().friendly) {
-        gltext = font().Text(var->Meta().friendly);
-    }
     gltext.DrawWindow(raster[0], raster[1]);
 
     std::ostringstream oss;

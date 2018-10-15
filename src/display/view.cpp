@@ -389,7 +389,13 @@ void View::GetObjectCoordinates(const OpenGlRenderState& cam_state, double winx,
 
 void View::GetCamCoordinates(const OpenGlRenderState& cam_state, double winx, double winy, double winzdepth, GLdouble& x, GLdouble& y, GLdouble& z) const
 {
-    v.GetCamCoordinates(cam_state, winx, winy, winzdepth, x, y, z);
+    const GLint viewport[4] = {v.l,v.b,v.w,v.h};
+    const OpenGlMatrix proj = cam_state.GetProjectionMatrix();
+#ifndef HAVE_GLES
+    glUnProject(winx, winy, winzdepth, Identity4d, proj.m, viewport, &x, &y, &z);
+#else
+    glUnProject(winx, winy, winzdepth, Identity4f, proj.m, viewport, &x, &y, &z);
+#endif
 }
 
 View& View::SetFocus()
@@ -499,15 +505,11 @@ void View::RecordOnRender(const std::string& record_uri)
     if(!context->recorder.IsOpen()) {
         Viewport area = GetBounds();
         context->record_view = this;
-        try{
-            context->recorder.Open(record_uri);
-            std::vector<StreamInfo> streams;
-            const PixelFormat fmt = PixelFormatFromString("RGB24");
-            streams.push_back( StreamInfo(fmt, area.w, area.h, area.w * fmt.bpp / 8) );
-            context->recorder.SetStreams(streams);
-        }catch(const std::exception& e) {
-            pango_print_error("Unable to open VideoRecorder:\n\t%s\n", e.what());
-        }
+        context->recorder.Open(record_uri);
+        std::vector<StreamInfo> streams;
+        const PixelFormat fmt = PixelFormatFromString("RGB24");
+        streams.push_back( StreamInfo(fmt, area.w, area.h, area.w * fmt.bpp / 8) );
+        context->recorder.SetStreams(streams);
     }else{
         context->recorder.Close();
     }

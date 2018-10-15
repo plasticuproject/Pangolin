@@ -134,14 +134,11 @@ bool V4lVideo::GrabNext( unsigned char* image, bool /*wait*/ )
             if (EINTR == errno)
                 continue;
             
-            // This is a terminal condition that must be propogated up.
             throw VideoException ("select", strerror(errno));
         }
         
         if (0 == r) {
-            // Timeout has occured - This is longer than any reasonable frame interval,
-            // but not necessarily terminal, so return false to indicate that no frame was captured.
-            return false;
+            throw VideoException("select Timeout", strerror(errno));
         }
         
         if (ReadFrame(image))
@@ -607,103 +604,48 @@ void V4lVideo::init_device(const char* dev_name, unsigned iwidth, unsigned iheig
         break;
     }
     
-    uint32_t bit_depth = 0;
-
     std::string spix="GRAY8";
     if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_GREY) {
         spix="GRAY8";
-        bit_depth = 8;
     }else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
         spix="YUYV422";
-        bit_depth = 8;
-    } else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_UYVY) {
-        spix="UYVY422";
-        bit_depth = 8;
     }else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_Y16) {
         spix="GRAY16LE";
-        bit_depth = 16;
     }else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_Y10) {
         spix="GRAY10";
-        bit_depth = 10;
     }else{
         // TODO: Add method to translate from V4L to FFMPEG type.
         std::cerr << "V4L Format " << V4lToString(fmt.fmt.pix.pixelformat)
                   << " not recognised. Defaulting to '" << spix << std::endl;
     }
 
-    PixelFormat pfmt = PixelFormatFromString(spix);
-    pfmt.channel_bit_depth = bit_depth;
+    const PixelFormat pfmt = PixelFormatFromString(spix);
     const StreamInfo stream_info(pfmt, width, height, (width*pfmt.bpp)/8, 0);
 
     streams.push_back(stream_info);
 }
 
-bool V4lVideo::SetExposure(int exposure_us)
+void V4lVideo::SetExposureUs(int exposure_us)
 {
-    struct v4l2_ext_controls ctrls = {};
-    struct v4l2_ext_control ctrl = {};
-
-    ctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    struct v4l2_control control;
+    control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
     // v4l specifies exposure in 100us units
-    ctrl.value = int(exposure_us / 100.0);
-    ctrls.ctrl_class = V4L2_CTRL_CLASS_CAMERA;
-    ctrls.count = 1;
-    ctrls.controls = &ctrl;
+    control.value = exposure_us / 100;
 
-    if (-1 == xioctl(fd, VIDIOC_S_EXT_CTRLS, &ctrls)){
-        pango_print_warn("V4lVideo::SetExposure() ioctl error: %s\n", strerror(errno));
-        return false;
-    } else {
-        return true;
-    }
+    if (-1 == xioctl (fd, VIDIOC_S_CTRL, &control))
+        pango_print_warn("V4lVideo::SetExposureUs() ioctl error: %s\n", strerror(errno));
+
 }
 
-bool V4lVideo::GetExposure(int& exposure_us)
-{
-    struct v4l2_ext_controls ctrls = {};
-    struct v4l2_ext_control ctrl = {};
-
-    ctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
-    ctrls.ctrl_class = V4L2_CTRL_CLASS_CAMERA;
-    ctrls.count = 1;
-    ctrls.controls = &ctrl;
-
-    if (-1 == xioctl(fd, VIDIOC_G_EXT_CTRLS, &ctrls)){
-        pango_print_warn("V4lVideo::GetExposure() ioctl error: %s\n", strerror(errno));
-        return false;
-    } else {
-        // v4l specifies exposure in 100us units
-        exposure_us = ctrls.controls->value * 100;
-        return true;
-    }
-}
-
-bool V4lVideo::SetGain(float gain)
+void V4lVideo::SetGain(double gain)
 {
     struct v4l2_control control;
     control.id = V4L2_CID_GAIN;
     control.value = gain;
 
-    if (-1 == xioctl (fd, VIDIOC_S_CTRL, &control)) {
+    if (-1 == xioctl (fd, VIDIOC_S_CTRL, &control))
         pango_print_warn("V4lVideo::SetGain() ioctl error: %s\n", strerror(errno));
-        return false;
-    } else {
-        return true;
-    }
-}
 
-bool V4lVideo::GetGain(float& gain)
-{
-    struct v4l2_control control;
-    control.id = V4L2_CID_GAIN;
-
-    if (-1 == xioctl (fd, VIDIOC_G_CTRL, &control)) {
-        pango_print_warn("V4lVideo::GetGain() ioctl error: %s\n", strerror(errno));
-        return false;
-    } else {
-        gain = control.value;
-        return true;
-    }
 }
 
 void V4lVideo::close_device()
@@ -781,7 +723,7 @@ PANGOLIN_REGISTER_FACTORY(V4lVideo)
 
             V4lVideo* video_raw = new V4lVideo(uri.url.c_str(), method, desired_dim.x, desired_dim.y );
             if(video_raw  && uri.Contains("ExposureTime")) {
-                static_cast<V4lVideo*>(video_raw)->SetExposure(uri.Get<int>("ExposureTime", 10000));
+                static_cast<V4lVideo*>(video_raw)->SetExposureUs(uri.Get<int>("ExposureTime", 10000));
             }
             if(video_raw  && uri.Contains("Gain")) {
                 static_cast<V4lVideo*>(video_raw)->SetGain(uri.Get<int>("Gain", 1));

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.6)
 project("Pangolin")
 set(PANGOLIN_VERSION_MAJOR 0)
 set(PANGOLIN_VERSION_MINOR 5)
@@ -10,7 +10,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/CMakeMod
 include(SetPlatformVars)
 
 SET(CPACK_GENERATOR "DEB")
-
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Steven Lovegrove")
 SET(CPACK_PACKAGE_VERSION_MAJOR ${PANGOLIN_VERSION_MAJOR})
 SET(CPACK_PACKAGE_VERSION_MINOR ${PANGOLIN_VERSION_MINOR})
@@ -48,8 +47,12 @@ else()
 endif()
 
 if(NOT MSVC)
-    set( CMAKE_CXX_FLAGS "-std=c++0x -Wall -Wextra ${CMAKE_CXX_FLAGS}" )
+    set( CMAKE_CXX_FLAGS "-std=c++14 -Wall -Wextra ${CMAKE_CXX_FLAGS}" )
+    if(_CLANG_)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    endif()
 endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")    # modified for python binding (add " -fPIC")
 
 if(ANDROID)
     set(ANDROID_PACKAGE_NAME "com.github.stevenlovegrove.pangolin")
@@ -75,7 +78,7 @@ if( NOT CMAKE_BUILD_TYPE AND NOT _WIN_ )
    set( CMAKE_BUILD_TYPE Release )
 endif()
 
-string(TOLOWER ${PROJECT_NAME} LIBRARY_NAME)
+string(TOLOWER _${PROJECT_NAME} LIBRARY_NAME)    # modified for python binding (add "_" to avoid naming conflict with python library "pangolin")
 
 # make an uninstall target 
 configure_file(
@@ -89,9 +92,9 @@ add_custom_target(uninstall
 
 add_subdirectory("external")
 add_subdirectory("src")
+add_subdirectory("python")
 
 if(BUILD_TESTS)
-  set(Pangolin_DIR ${Pangolin_BINARY_DIR}/src)
   add_subdirectory("test")
 endif()
 
